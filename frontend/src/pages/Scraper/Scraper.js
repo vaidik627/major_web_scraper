@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { PlusIcon, TrashIcon, GlobeAltIcon, QuestionMarkCircleIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, TrashIcon, GlobeAltIcon, QuestionMarkCircleIcon, InformationCircleIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
+import SummaryCustomization from '../../components/AI/SummaryCustomization';
 import toast from 'react-hot-toast';
 
 const Scraper = () => {
@@ -30,6 +31,17 @@ const Scraper = () => {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState([]);
+  const [showEnhancedOptions, setShowEnhancedOptions] = useState(false);
+  const [summaryCustomization, setSummaryCustomization] = useState({
+    summaryType: 'balanced',
+    detailLevel: 'medium',
+    outputFormat: 'paragraph',
+    focusAreas: [],
+    highlightRelevantText: true,
+    includeKeywords: true,
+    maxLength: null,
+    userQuery: ''
+  });
 
   const quickScrapeLoading = false;
 
