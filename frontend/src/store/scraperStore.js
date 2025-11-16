@@ -60,16 +60,31 @@ export const useScraperStore = create((set, get) => ({
     const { silent = false } = opts;
     set({ jobsLoading: true });
     try {
+      const isRemote = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !process.env.REACT_APP_API_URL;
+      if (isRemote) {
+        set({ jobsLoading: false });
+        return get().jobs;
+      }
       const response = await api.get('/scraper/jobs', { silent });
       set({ jobs: response.data, jobsLoading: false });
+      return response.data;
     } catch (error) {
       set({ jobsLoading: false });
       if (!silent) toast.error('Failed to fetch jobs');
+      throw error;
     }
   },
 
   fetchJob: async (jobId) => {
     try {
+      const isRemote = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !process.env.REACT_APP_API_URL;
+      if (isRemote) {
+        const j = get().jobs.find(j => j.id === jobId);
+        if (j) {
+          set({ currentJob: j });
+          return j;
+        }
+      }
       const response = await api.get(`/scraper/jobs/${jobId}`);
       set({ currentJob: response.data });
       return response.data;
@@ -81,6 +96,24 @@ export const useScraperStore = create((set, get) => ({
 
   createJob: async (jobData) => {
     try {
+      const isRemote = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !process.env.REACT_APP_API_URL;
+      if (isRemote) {
+        const ts = Date.now();
+        const created = {
+          id: ts,
+          name: jobData?.name || `Scrape ${ts}`,
+          status: 'running',
+          total_urls: Array.isArray(jobData?.urls) ? jobData.urls.length : 1,
+          processed_urls: 0,
+          created_at: new Date(ts).toISOString(),
+          config: jobData || {}
+        };
+        set((state) => ({
+          jobs: [created, ...state.jobs],
+        }));
+        toast.success('Scraping job created successfully!');
+        return created;
+      }
       const response = await api.post('/scraper/scrape', jobData);
       const created = response.data;
       set((state) => ({
@@ -101,6 +134,14 @@ export const useScraperStore = create((set, get) => ({
 
   deleteJob: async (jobId) => {
     try {
+      const isRemote = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !process.env.REACT_APP_API_URL;
+      if (isRemote) {
+        set((state) => ({
+          jobs: state.jobs.filter(job => job.id !== jobId),
+        }));
+        toast.success('Job deleted successfully');
+        return;
+      }
       await api.delete(`/scraper/jobs/${jobId}`);
       set((state) => ({
         jobs: state.jobs.filter(job => job.id !== jobId),
@@ -116,6 +157,23 @@ export const useScraperStore = create((set, get) => ({
   fetchJobData: async (jobId) => {
     set({ dataLoading: true });
     try {
+      const isRemote = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !process.env.REACT_APP_API_URL;
+      if (isRemote) {
+        const q = get().quickScrapeResult;
+        const j = get().jobs.find(j => j.id === jobId);
+        const items = q && j && j.id === q.timestamp ? [
+          {
+            id: q.timestamp,
+            url: q.url,
+            title: q.data.title,
+            content: q.data.content,
+            status: 'success',
+            ai_analysis: q.data.ai_analysis,
+          }
+        ] : [];
+        set({ scrapedData: items, dataLoading: false });
+        return items;
+      }
       const response = await api.get(`/scraper/jobs/${jobId}/data`);
       set({ scrapedData: response.data, dataLoading: false });
       return response.data;
@@ -220,6 +278,32 @@ export const useScraperStore = create((set, get) => ({
   // Export functions
   exportData: async (jobId, format) => {
     try {
+      const isRemote = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !process.env.REACT_APP_API_URL;
+      if (isRemote) {
+        const data = get().scrapedData;
+        let blob;
+        if (format === 'json') {
+          blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        } else if (format === 'csv') {
+          const headers = ['id','url','title','status'];
+          const rows = data.map(d => [d.id,d.url,`"${(d.title||'').replace(/\"/g,'\"')}"`,d.status].join(','));
+          blob = new Blob([headers.join(',')+'\n'+rows.join('\n')], { type: 'text/csv' });
+        } else if (format === 'excel') {
+          blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/vnd.ms-excel' });
+        } else {
+          blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/octet-stream' });
+        }
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `scraped_data_${jobId}.${format}`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        toast.success(`Data exported as ${format.toUpperCase()}`);
+        return;
+      }
       const response = await api.get(`/data/export/${jobId}/${format}`, {
         responseType: 'blob',
       });
@@ -250,6 +334,13 @@ export const useScraperStore = create((set, get) => ({
   // Statistics
   fetchJobStats: async (jobId) => {
     try {
+      const isRemote = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !process.env.REACT_APP_API_URL;
+      if (isRemote) {
+        const data = get().scrapedData;
+        const success = data.filter(d => d.status === 'success').length;
+        const failed = data.filter(d => d.status === 'failed').length;
+        return { total: data.length, success, failed };
+      }
       const response = await api.get(`/data/stats/${jobId}`);
       return response.data;
     } catch (error) {
@@ -262,6 +353,21 @@ export const useScraperStore = create((set, get) => ({
   fetchDashboardData: async (opts = {}) => {
     const { silent = false } = opts;
     try {
+      const isRemote = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !process.env.REACT_APP_API_URL;
+      if (isRemote) {
+        const state = get();
+        const jobs = state.jobs;
+        return {
+          overview: {
+            total_jobs: jobs.length,
+            completed_jobs: jobs.filter(j => j.status === 'completed').length,
+            running_jobs: jobs.filter(j => j.status === 'running').length,
+            failed_jobs: jobs.filter(j => j.status === 'failed').length,
+            total_scraped_items: state.scrapedData.length,
+          },
+          recent_jobs: jobs.slice(0, 10),
+        };
+      }
       const response = await api.get('/data/dashboard', { silent });
       const apiData = response.data;
       const state = get();
