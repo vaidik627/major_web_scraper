@@ -8,7 +8,7 @@ import uuid
 
 from database import get_db
 from models import User, ScrapingJob, ScrapedData
-from routers.auth import get_current_user
+from sqlalchemy.orm import Session
 from services.scraper_service import ScraperService
 from services.ai_service import AIService
 from services.enhanced_ai_integration import EnhancedAIIntegrationService
@@ -106,13 +106,13 @@ ai_service = AIService()
 async def create_scraping_job(
     request: ScrapingRequest,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a new scraping job"""
     # Create job record
+    public_user = get_public_user(db)
     job = ScrapingJob(
-        user_id=current_user.id,
+        user_id=public_user.id,
         name=request.name,
         urls=[str(url) for url in request.urls],
         config=request.config.dict(),
@@ -139,7 +139,6 @@ async def create_scraping_job(
 async def create_enhanced_ai_scraping_job(
     request: EnhancedAIScrapingRequest,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a new scraping job with enhanced multi-model AI analysis"""
@@ -148,8 +147,9 @@ async def create_enhanced_ai_scraping_job(
     request.config.use_enhanced_ai = True
     
     # Create job
+    public_user = get_public_user(db)
     job = ScrapingJob(
-        user_id=current_user.id,
+        user_id=public_user.id,
         name=request.name,
         urls=[str(url) for url in request.urls],
         config=request.config.dict(),
@@ -175,27 +175,43 @@ async def create_enhanced_ai_scraping_job(
 
 @router.get("/jobs", response_model=List[ScrapingJobResponse])
 async def get_user_jobs(
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 100
 ):
-    """Get user's scraping jobs"""
-    jobs = db.query(ScrapingJob).filter(
-        ScrapingJob.user_id == current_user.id
-    ).offset(skip).limit(limit).all()
+    """Get scraping jobs (public, no auth)"""
+    jobs = db.query(ScrapingJob).order_by(ScrapingJob.created_at.desc()).offset(skip).limit(limit).all()
     return jobs
+
+@router.get("/jobs-all")
+async def get_jobs_direct():
+    import sqlite3, os
+    db_path = os.path.abspath(os.getenv("DATABASE_URL", "sqlite:///./scraper.db").replace("sqlite:///", ""))
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    try:
+        rows = cur.execute('SELECT id,name,status,total_urls,processed_urls,created_at FROM scraping_jobs ORDER BY created_at DESC').fetchall()
+        return [
+            {
+                "id": r[0],
+                "name": r[1],
+                "status": r[2],
+                "total_urls": r[3],
+                "processed_urls": r[4],
+                "created_at": r[5],
+            } for r in rows
+        ]
+    finally:
+        conn.close()
 
 @router.get("/jobs/{job_id}", response_model=ScrapingJobResponse)
 async def get_job(
     job_id: int,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get specific job details"""
     job = db.query(ScrapingJob).filter(
-        ScrapingJob.id == job_id,
-        ScrapingJob.user_id == current_user.id
+        ScrapingJob.id == job_id
     ).first()
     
     if not job:
@@ -206,7 +222,6 @@ async def get_job(
 @router.get("/jobs/{job_id}/data", response_model=List[ScrapedDataResponse])
 async def get_job_data(
     job_id: int,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 100
@@ -214,8 +229,7 @@ async def get_job_data(
     """Get scraped data for a specific job"""
     # Verify job ownership
     job = db.query(ScrapingJob).filter(
-        ScrapingJob.id == job_id,
-        ScrapingJob.user_id == current_user.id
+        ScrapingJob.id == job_id
     ).first()
     
     if not job:
@@ -230,13 +244,11 @@ async def get_job_data(
 @router.delete("/jobs/{job_id}")
 async def delete_job(
     job_id: int,
-    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Delete a scraping job and its data"""
     job = db.query(ScrapingJob).filter(
-        ScrapingJob.id == job_id,
-        ScrapingJob.user_id == current_user.id
+        ScrapingJob.id == job_id
     ).first()
     
     if not job:
@@ -253,8 +265,7 @@ async def delete_job(
 async def quick_scrape(
     url: HttpUrl,
     config: Optional[ScrapingConfig] = None,
-    use_ai: bool = True,
-    current_user: User = Depends(get_current_user)
+    use_ai: bool = True
 ):
     """Quick scrape a single URL without saving to database"""
     if not config:
@@ -518,8 +529,7 @@ async def quick_enhanced_summary(
     url: str,
     summary_type: str = "balanced",
     detail_level: str = "medium",
-    user_query: Optional[str] = None,
-    current_user: User = Depends(get_current_user)
+    user_query: Optional[str] = None
 ):
     """Quick enhanced summary generation for a single URL"""
     try:
@@ -658,3 +668,73 @@ async def run_enhanced_ai_scraping_job(
         db.commit()
     finally:
         db.close()
+def get_public_user(db: Session):
+    user = db.query(User).filter(User.username == "public").first()
+    if not user:
+        from routers.auth import get_password_hash
+        user = User(username="public", email="public@example.com", hashed_password=get_password_hash("public"))
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
+@router.post("/scrape-direct")
+async def create_scraping_job_direct(
+    request: ScrapingRequest,
+    db: Session = Depends(get_db)
+):
+    """Create and run scraping job synchronously (compat), ensures job appears on dashboard."""
+    public_user = get_public_user(db)
+    job = ScrapingJob(
+        user_id=public_user.id,
+        name=request.name,
+        urls=[str(url) for url in request.urls],
+        config=request.config.dict(),
+        total_urls=len(request.urls),
+        status="running",
+        started_at=datetime.utcnow()
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    processed = 0
+    for url in request.urls:
+        try:
+            result = await scraper_service.scrape_url(str(url), request.config.dict())
+            has_error = bool(result.get("error"))
+            has_content = bool(result.get("content"))
+            status = "failed" if has_error or not has_content else "success"
+            processing_time = result.get("metadata", {}).get("processing_time") or result.get("processing_time")
+
+            scraped_data = ScrapedData(
+                job_id=job.id,
+                url=str(url),
+                title=result.get("title"),
+                content=result.get("content"),
+                extracted_data=result.get("extracted_data"),
+                ai_analysis=None,
+                status=status,
+                error_message=result.get("error") if status == "failed" else None,
+                processing_time=processing_time
+            )
+            db.add(scraped_data)
+            processed += 1
+            job.processed_urls = processed
+            db.commit()
+        except Exception as e:
+            scraped_data = ScrapedData(
+                job_id=job.id,
+                url=str(url),
+                status="failed",
+                error_message=str(e)
+            )
+            db.add(scraped_data)
+            processed += 1
+            job.processed_urls = processed
+            db.commit()
+
+    job.status = "completed"
+    job.completed_at = datetime.utcnow()
+    db.commit()
+
+    return job

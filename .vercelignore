@@ -1,0 +1,8 @@
+backend/
+.git/
+*.log
+node_modules/
+**/node_modules/
+.env*
+Dockerfile
+nginx.conf

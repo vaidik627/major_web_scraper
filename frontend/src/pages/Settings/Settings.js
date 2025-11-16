@@ -1,63 +1,12 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import toast from 'react-hot-toast';
-import {
-  UserCircleIcon,
-  KeyIcon,
-  BellIcon,
-  CogIcon,
-  TrashIcon,
-} from '@heroicons/react/24/outline';
-import { useAuthStore } from '../../store/authStore';
+import { UserCircleIcon, KeyIcon, BellIcon, CogIcon } from '@heroicons/react/24/outline';
 import { useThemeStore } from '../../store/themeStore';
-import api from '../../services/api';
-import ConfirmationModal from '../../components/UI/ConfirmationModal';
 
 const Settings = () => {
-  const { user, logout } = useAuthStore();
   const { isDark, toggleTheme } = useThemeStore();
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('profile');
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDeleteAccount = async () => {
-    setIsDeleting(true);
-    
-    try {
-      const loadingToast = toast.loading('Deleting your account and all data...');
-      
-      await api.delete('/auth/delete-account');
-      
-      toast.dismiss(loadingToast);
-      toast.success('Account deleted successfully. You will be redirected to the login page.');
-      
-      // Close modal and clear auth state
-      setShowDeleteModal(false);
-      logout();
-      navigate('/login');
-    } catch (error) {
-      console.error('Error deleting account:', error);
-      
-      if (error.response?.status === 401) {
-        toast.error('Authentication failed. Please log in again and try deleting your account.');
-      } else if (error.response?.status === 404) {
-        toast.error('Account not found. Please contact support if this issue persists.');
-      } else if (error.response?.status >= 500) {
-        toast.error('Server error occurred while deleting account. Please try again later or contact support.');
-      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        toast.error('Request timed out. Please check your internet connection and try again.');
-      } else if (!error.response) {
-        toast.error('Network error. Please check your internet connection and ensure the backend server is running.');
-      } else {
-        const errorMessage = error.response?.data?.detail || error.message || 'Unknown error occurred';
-        toast.error(`Failed to delete account: ${errorMessage}. Please try again or contact support.`);
-      }
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const tabs = [
     { id: 'profile', name: 'Profile', icon: UserCircleIcon },
@@ -119,23 +68,13 @@ const Settings = () => {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Username
                     </label>
-                    <input
-                      type="text"
-                      value={user?.username || ''}
-                      disabled
-                      className="mt-1 input bg-gray-50 dark:bg-gray-700"
-                    />
+                    <input type="text" value={''} disabled className="mt-1 input bg-gray-50 dark:bg-gray-700" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Email
                     </label>
-                    <input
-                      type="email"
-                      value={user?.email || ''}
-                      disabled
-                      className="mt-1 input bg-gray-50 dark:bg-gray-700"
-                    />
+                    <input type="email" value={''} disabled className="mt-1 input bg-gray-50 dark:bg-gray-700" />
                   </div>
                 </div>
                 <div className="flex justify-end">
@@ -175,22 +114,7 @@ const Settings = () => {
                     </button>
                   </div>
                   
-                  {/* Delete Account Section */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                      Delete Account
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                      Permanently delete your account and all associated data.
-                    </p>
-                    <button
-                      onClick={() => setShowDeleteModal(true)}
-                      className="mt-3 inline-flex items-center px-3 py-2 border border-red-300 dark:border-red-600 text-sm leading-4 font-medium rounded-md text-red-700 dark:text-red-200 bg-white dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-900/20 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
-                    >
-                      <TrashIcon className="h-4 w-4 mr-2" />
-                      Delete Account
-                    </button>
-                  </div>
+                  
 
                 </div>
               </div>
@@ -301,21 +225,7 @@ const Settings = () => {
         </div>
        </div>
 
-       {/* Delete Account Confirmation Modal */}
-       <ConfirmationModal
-         isOpen={showDeleteModal}
-         onClose={() => setShowDeleteModal(false)}
-         onConfirm={handleDeleteAccount}
-         title="Delete Account"
-         message="⚠️ WARNING: This will permanently delete your account and ALL your data! This includes all scraping jobs, scraped data, AI insights, templates, and settings. This action CANNOT be undone!"
-         confirmText="Delete Account"
-         cancelText="Cancel"
-         type="danger"
-         requireTextConfirmation={true}
-         confirmationText="DELETE"
-         isLoading={isDeleting}
-         loadingText="Deleting your account and all data..."
-       />
+      
     </div>
   );
 };

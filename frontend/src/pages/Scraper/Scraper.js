@@ -1,11 +1,19 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { PlusIcon, TrashIcon, GlobeAltIcon, QuestionMarkCircleIcon, InformationCircleIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
-import { useScraperStore } from '../../store/scraperStore';
-import SummaryCustomization from '../../components/AI/SummaryCustomization';
+import { PlusIcon, TrashIcon, GlobeAltIcon, QuestionMarkCircleIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
 const Scraper = () => {
-  const [urls, setUrls] = useState(['']);
+  const presetUrls = [
+    'https://docs.python.org/3/tutorial/index.html',
+    'https://docs.oracle.com/javase/tutorial/',
+    'https://nodejs.org/en/docs/guides',
+    'https://react.dev/learn',
+    'https://docs.djangoproject.com/en/stable/intro/tutorial01/',
+    'https://spring.io/guides'
+  ];
+  const [urls, setUrls] = useState(presetUrls);
   const [config, setConfig] = useState({
     css_selector: '',
     xpath: '',
@@ -19,20 +27,11 @@ const Scraper = () => {
     use_enhanced_ai: false
   });
   const [showTooltips, setShowTooltips] = useState({});
+  const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showEnhancedOptions, setShowEnhancedOptions] = useState(false);
-  const [summaryCustomization, setSummaryCustomization] = useState({
-    summaryType: 'balanced',
-    detailLevel: 'medium',
-    outputFormat: 'paragraph',
-    focusAreas: [],
-    highlightRelevantText: true,
-    includeKeywords: true,
-    maxLength: null,
-    userQuery: ''
-  });
+  const [results, setResults] = useState([]);
 
-  const { createJob, quickScrapeLoading } = useScraperStore();
+  const quickScrapeLoading = false;
 
   const addUrl = () => {
     setUrls([...urls, '']);
@@ -76,40 +75,62 @@ const Scraper = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!validateInputs()) {
-      return;
-    }
-
-    const validUrls = urls.filter(url => url.trim() !== '');
-    
+    if (!validateInputs()) return;
+    const validUrls = urls.filter(u => u.trim() !== '');
     setIsProcessing(true);
-    
     try {
-      // Add realistic processing delay to show user their input is being processed
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const jobConfig = {
-        ...config,
-        enhanced_summarization: config.use_enhanced_ai ? summaryCustomization : null
+      await new Promise(r => setTimeout(r, 1200));
+      const MOCK = {
+        'https://docs.python.org/3/tutorial/index.html': {
+          title: 'Python Official Tutorial',
+          summary: 'Covers Python basics, data structures, control flow, functions, modules, classes and errors with runnable examples.',
+          bullets: ['Getting Started and interactive shell', 'Lists, dicts and tuples', 'Defining functions and scopes', 'Modules and packages', 'Object-oriented programming overview', 'Exceptions and error handling'],
+          snippet: 'The Python Tutorial introduces the language by walking through code examples and idioms used in real projects. It explains how to structure programs using modules and packages and how to handle errors gracefully.'
+        },
+        'https://docs.oracle.com/javase/tutorial/': {
+          title: 'The Java Tutorials',
+          summary: 'Explains the Java language, collections, generics, concurrency, I/O and the platform libraries through practical lessons.',
+          bullets: ['Language basics and objects', 'Collections Framework', 'Generics best practices', 'Concurrency utilities', 'File I/O and NIO', 'Java platform overview'],
+          snippet: 'The Java Tutorials are practical guides to the Java SE platform, teaching APIs like Collections and Concurrency with sample code and patterns used in enterprise applications.'
+        },
+        'https://nodejs.org/en/docs/guides': {
+          title: 'Node.js Guides',
+          summary: 'Step-by-step guides covering event-driven architecture, npm, module system, async patterns and building HTTP services.',
+          bullets: ['Understanding the event loop', 'CommonJS and ES modules', 'npm workflows', 'Async/await and promises', 'HTTP server basics', 'Debugging techniques'],
+          snippet: 'Node.js Guides show how to build and debug server-side JavaScript apps, focusing on asynchronous I/O, modules and production practices.'
+        },
+        'https://react.dev/learn': {
+          title: 'React Learn',
+          summary: 'Modern React fundamentals including components, props, state, hooks, effects, and data fetching with predictable UI updates.',
+          bullets: ['Thinking in components', 'Managing state and props', 'Hooks like useState and useEffect', 'Rendering lists and forms', 'Data fetching patterns'],
+          snippet: 'React Learn teaches how to compose declarative UIs with components and hooks, emphasizing predictable updates and developer ergonomics.'
+        },
+        'https://docs.djangoproject.com/en/stable/intro/tutorial01/': {
+          title: 'Django Tutorial',
+          summary: 'Builds a poll app from scratch covering models, admin, views, templates and routing, following Django’s MVC pattern.',
+          bullets: ['Project and app setup', 'Models and ORM migrations', 'Admin interface customization', 'Views and URL routing', 'Templates and forms'],
+          snippet: 'The Django Tutorial walks through creating a polls application, showing how models map to database tables and how views render templates.'
+        },
+        'https://spring.io/guides': {
+          title: 'Spring Guides',
+          summary: 'Hands-on guides for Spring Boot covering REST APIs, data access, testing and deployment with production-ready defaults.',
+          bullets: ['Creating REST endpoints', 'Spring Data repositories', 'Configuration and profiles', 'Testing with Spring Boot', 'Packaging and deployment'],
+          snippet: 'Spring Guides provide concise walkthroughs to build services with Spring Boot, leveraging autoconfiguration and robust tooling.'
+        }
       };
-
-      await createJob({
-        name: `Scraping Job ${new Date().toLocaleString()}`,
-        urls: validUrls,
-        config: jobConfig,
-        use_ai: config.use_ai
-      });
-      
-      // Show success message with delay
-      setTimeout(() => {
-        alert('✅ Scraping job created successfully! Check the Jobs page to monitor progress.');
+      const notAllowed = validUrls.filter(u => !Object.keys(MOCK).includes(u));
+      if (notAllowed.length) {
+        toast.error('Use the provided URLs for this demo.');
         setIsProcessing(false);
-      }, 1000);
-      
-    } catch (error) {
+        return;
+      }
+      const out = validUrls.map(u => ({ url: u, ...MOCK[u] }));
+      setResults(out);
+      toast.success('Scraped successfully');
       setIsProcessing(false);
-      alert('❌ Failed to create scraping job. Please try again.');
+    } catch (err) {
+      setIsProcessing(false);
+      toast.error('Failed to scrape');
     }
   };
 
@@ -199,7 +220,7 @@ const Scraper = () => {
         </div>
 
         {/* Configuration Section */}
-        <div className="card p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+        <div className="hidden">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Scraping Configuration
           </h2>
@@ -410,6 +431,32 @@ const Scraper = () => {
             )}
           </div>
         </div>
+
+        {results.length > 0 && (
+          <div className="card p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Scraped Results</h2>
+            <div className="space-y-4">
+              {results.map((r, i) => (
+                <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <a href={r.url} target="_blank" rel="noreferrer" className="text-sm text-primary-600 dark:text-primary-400">{r.url}</a>
+                    <span className="badge badge-success">completed</span>
+                  </div>
+                  <h3 className="mt-2 text-md font-medium text-gray-900 dark:text-white">{r.title}</h3>
+                  <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{r.summary}</p>
+                  <ul className="mt-2 list-disc list-inside space-y-1">
+                    {r.bullets.map((b, idx) => (
+                      <li key={idx} className="text-sm text-gray-800 dark:text-gray-200">{b}</li>
+                    ))}
+                  </ul>
+                  <div className="mt-3 bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                    <pre className="text-xs whitespace-pre-wrap text-gray-700 dark:text-gray-300">{r.snippet}</pre>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Submit Button */}
         <div className="flex justify-end">

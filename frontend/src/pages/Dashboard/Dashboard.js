@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -10,20 +10,20 @@ import {
   ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { useScraperStore } from '../../store/scraperStore';
-import { SidebarContext } from '../../components/Layout/Layout';
 
 const Dashboard = () => {
-  const { } = useContext(SidebarContext);
   const { fetchJobs, fetchDashboardData } = useScraperStore();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let intervalId;
+
     const loadDashboardData = async () => {
       try {
         const [, dashData] = await Promise.all([
-          fetchJobs(),
-          fetchDashboardData(),
+          fetchJobs({ silent: true }),
+          fetchDashboardData({ silent: true }),
         ]);
         setDashboardData(dashData);
       } catch (error) {
@@ -34,6 +34,11 @@ const Dashboard = () => {
     };
 
     loadDashboardData();
+    intervalId = setInterval(loadDashboardData, 5000);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [fetchJobs, fetchDashboardData]);
 
   const stats = dashboardData?.overview || {
@@ -85,7 +90,7 @@ const Dashboard = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-extrabold tracking-tight text-gradient">Dashboard</h1>
-        <div className="mt-4 sm:mt-0">
+        <div className="mt-4 sm:mt-0 flex items-center space-x-3">
           <Link
             to="/scraper"
             className="btn-primary inline-flex items-center"
@@ -93,6 +98,24 @@ const Dashboard = () => {
             <PlusIcon className="h-4 w-4 mr-2" />
             New Scraping Job
           </Link>
+          <button
+            type="button"
+            onClick={async () => {
+              setLoading(true);
+              try {
+                const [, dashData] = await Promise.all([
+                  fetchJobs({ silent: true }),
+                  fetchDashboardData({ silent: true }),
+                ]);
+                setDashboardData(dashData);
+              } finally {
+                setLoading(false);
+              }
+            }}
+            className="btn-outline"
+          >
+            Refresh
+          </button>
         </div>
       </div>
 

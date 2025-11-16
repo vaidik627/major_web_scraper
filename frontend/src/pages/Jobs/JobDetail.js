@@ -32,10 +32,28 @@ const JobDetail = () => {
   });
 
   useEffect(() => {
-    if (id) {
-      fetchJob(parseInt(id));
-      fetchJobData(parseInt(id));
-    }
+    let intervalId;
+    const load = async () => {
+      if (!id) return;
+      const jobId = parseInt(id);
+      try {
+        await fetchJob(jobId);
+        await fetchJobData(jobId);
+      } catch (e) {}
+    };
+    load();
+    intervalId = setInterval(() => {
+      // Poll frequently while running, slower when completed
+      if (currentJob?.status === 'completed' || currentJob?.status === 'failed') {
+        clearInterval(intervalId);
+      } else {
+        load();
+      }
+    }, 3000);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [id, fetchJob, fetchJobData]);
 
   const handleExport = async (format) => {

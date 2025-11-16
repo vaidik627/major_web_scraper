@@ -14,7 +14,17 @@ const Jobs = () => {
   const { jobs, jobsLoading, fetchJobs, deleteJob } = useScraperStore();
 
   useEffect(() => {
-    fetchJobs();
+    let intervalId;
+    const load = async () => {
+      try {
+        await fetchJobs();
+      } catch (e) {}
+    };
+    load();
+    intervalId = setInterval(load, 5000);
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [fetchJobs]);
 
   const getStatusIcon = (status) => {

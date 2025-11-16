@@ -110,7 +110,7 @@ const EntitiesChart = ({ entities = [] }) => {
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.2, delay: (index * 0.1) + (entityIndex * 0.05) }}
                     className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
-                    title={`Confidence: ${(entity.confidence_score * 100).toFixed(1)}%`}
+                    title={typeof entity.confidence_score === 'number' ? `Confidence: ${(entity.confidence_score * 100).toFixed(1)}%` : undefined}
                   >
                     {entity.entity_text}
                     {entity.confidence_score && (

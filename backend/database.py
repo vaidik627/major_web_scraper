@@ -7,6 +7,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./scraper.db")
+if DATABASE_URL.startswith("sqlite:///./"):
+    abs_path = os.path.abspath(DATABASE_URL.replace("sqlite:///", ""))
+    # Normalize Windows path to forward slashes for SQLAlchemy URL
+    abs_path = abs_path.replace("\\", "/")
+    DATABASE_URL = f"sqlite:///{abs_path}"
+print(f"Using DATABASE_URL: {DATABASE_URL}")
 
 # Create engine
 if DATABASE_URL.startswith("sqlite"):
