@@ -286,8 +286,8 @@ export const useScraperStore = create((set, get) => ({
           blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         } else if (format === 'csv') {
           const headers = ['id','url','title','status'];
-          const rows = data.map(d => [d.id,d.url,`"${(d.title||'').replace(/\"/g,'\"')}"`,d.status].join(','));
-          blob = new Blob([headers.join(',')+'\n'+rows.join('\n')], { type: 'text/csv' });
+          const rows = data.map(d => [d.id, d.url, '"' + (d.title || '').replace(/"/g, '""') + '"', d.status].join(','));
+          blob = new Blob([headers.join(',') + '\n' + rows.join('\n')], { type: 'text/csv' });
         } else if (format === 'excel') {
           blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/vnd.ms-excel' });
         } else {
