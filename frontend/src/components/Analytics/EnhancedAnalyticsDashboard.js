@@ -10,7 +10,6 @@ import {
   ArrowPathIcon
 } from '@heroicons/react/24/outline';
 
-import EntitiesChart from './EntitiesChart';
 import CategoriesChart from './CategoriesChart';
 import TrendsChart from './TrendsChart';
 import DomainComparison from './DomainComparison';
@@ -80,13 +79,6 @@ const EnhancedAnalyticsDashboard = () => {
     }
   ];
 
-  const analysisTypes = [
-    { id: 'entities', label: 'Entities' },
-    { id: 'categories', label: 'Categories' },
-    { id: 'sentiment', label: 'Sentiment' },
-    { id: 'keywords', label: 'Keywords' },
-    { id: 'summary', label: 'Summary' }
-  ];
 
   const handleComprehensiveAnalysis = async () => {
     if (!analysisForm.content.trim()) {

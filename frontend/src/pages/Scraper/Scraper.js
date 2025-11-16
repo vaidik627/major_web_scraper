@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PlusIcon, TrashIcon, GlobeAltIcon, QuestionMarkCircleIcon, InformationCircleIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
 import SummaryCustomization from '../../components/AI/SummaryCustomization';
@@ -28,7 +27,6 @@ const Scraper = () => {
     use_enhanced_ai: false
   });
   const [showTooltips, setShowTooltips] = useState({});
-  const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState([]);
   const [showEnhancedOptions, setShowEnhancedOptions] = useState(false);

@@ -54,7 +54,7 @@ const JobDetail = () => {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [id, fetchJob, fetchJobData]);
+  }, [id, fetchJob, fetchJobData, currentJob?.status]);
 
   const handleExport = async (format) => {
     try {
