@@ -68,34 +68,62 @@ const JobDetail = () => {
     setLoadingEnhanced(prev => ({ ...prev, [itemId]: true }));
     
     try {
-      const response = await fetch('/api/scraper/enhanced-summary', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          content,
-          title: title || '',
-          url: url || '',
-          summary_type: summaryCustomization.summaryType,
-          detail_level: summaryCustomization.detailLevel,
-          output_format: summaryCustomization.outputFormat,
-          focus_areas: summaryCustomization.focusAreas,
-          highlight_relevant_text: summaryCustomization.highlightRelevantText,
-          include_keywords: summaryCustomization.includeKeywords,
-          max_length: summaryCustomization.maxLength,
-          user_query: summaryCustomization.userQuery
-        })
-      });
+      const isRemote = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && !process.env.REACT_APP_API_URL;
+      if (isRemote) {
+        const text = (content || '').toString();
+        const words = text.split(/\s+/).filter(Boolean);
+        const maxLen = summaryCustomization.maxLength || 200;
+        const summary = words.slice(0, maxLen).join(' ');
+        const keyPoints = (text.match(/\n\n/g) || []).length > 0
+          ? text.split(/\n\n+/).slice(0, 4).map(p => p.split(/\n/)[0]).filter(Boolean)
+          : words.slice(0, 60).join(' ').split(/\./).slice(0, 4);
+        const result = {
+          overview: {
+            title: title || url || 'Enhanced Summary',
+            url: url || '',
+            summary,
+            word_count: words.length,
+            key_points: keyPoints,
+          },
+          sections: [
+            { name: 'Highlights', content: keyPoints.join('\n') },
+            { name: 'Extract', content: summary },
+          ],
+          metadata: {
+            customization: summaryCustomization,
+          },
+        };
+        setEnhancedSummaries(prev => ({ ...prev, [itemId]: result }));
+      } else {
+        const response = await fetch('/api/scraper/enhanced-summary', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            content,
+            title: title || '',
+            url: url || '',
+            summary_type: summaryCustomization.summaryType,
+            detail_level: summaryCustomization.detailLevel,
+            output_format: summaryCustomization.outputFormat,
+            focus_areas: summaryCustomization.focusAreas,
+            highlight_relevant_text: summaryCustomization.highlightRelevantText,
+            include_keywords: summaryCustomization.includeKeywords,
+            max_length: summaryCustomization.maxLength,
+            user_query: summaryCustomization.userQuery
+          })
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to generate enhanced summary');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to generate enhanced summary');
+        }
+
+        const result = await response.json();
+        setEnhancedSummaries(prev => ({ ...prev, [itemId]: result }));
       }
-
-      const result = await response.json();
-      setEnhancedSummaries(prev => ({ ...prev, [itemId]: result }));
     } catch (error) {
       console.error('Enhanced summary generation failed:', error);
       // Show error message to user
