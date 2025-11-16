@@ -7,10 +7,7 @@
       "config": { "distDir": "build" }
     }
   ],
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "redirects": [
-    { "source": "/", "destination": "/index.html", "permanent": false }
+  "routes": [
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
