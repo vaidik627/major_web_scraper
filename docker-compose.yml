@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: scraper_postgres
+    environment:
+      POSTGRES_DB: scraper_db
+      POSTGRES_USER: scraper_user
+      POSTGRES_PASSWORD: scraper_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - scraper_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scraper_user -d scraper_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: scraper_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - scraper_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: scraper_backend
+    environment:
+      - DATABASE_URL=postgresql://scraper_user:scraper_password@postgres:5432/scraper_db
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=your-super-secret-key-change-in-production
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - scraper_network
+    volumes:
+      - ./backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: scraper_celery_worker
+    environment:
+      - DATABASE_URL=postgresql://scraper_user:scraper_password@postgres:5432/scraper_db
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=your-super-secret-key-change-in-production
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - scraper_network
+    volumes:
+      - ./backend:/app
+    command: celery -A celery_app worker --loglevel=info
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: scraper_frontend
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - scraper_network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm start
+
+  # Nginx (Production)
+  nginx:
+    image: nginx:alpine
+    container_name: scraper_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - scraper_network
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+
+networks:
+  scraper_network:
+    driver: bridge
